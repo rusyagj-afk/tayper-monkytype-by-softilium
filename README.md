@@ -1,81 +1,129 @@
 # softilium
 
-A high-precision, humanized Monkeytype client built in Rust. Interacts directly with Chromium instances using the Chrome DevTools Protocol (CDP) via asynchronous WebSockets.
+Высокоточный клиент автоматизации и прохождения тестов на **Monkeytype**, написанный на **Rust**. Работает через прямое подключение к браузерам на базе Chromium по протоколу **Chrome DevTools Protocol (CDP)** через асинхронные WebSocket-соединения.
 
-## Overview
+---
 
-Unlike standard keystroke injection utilities or DOM automation wrappers that degrade under high speeds, `softilium` connects directly to the browser's CDP WebSocket interface (`/json` & `Input.dispatchKeyEvent`). It models real human typing biometrics, ensuring tests pass anti-cheat consistency and telemetry analysis.
+## О проекте
 
-## Key Features
+В отличие от стандартных скриптов кликеров, внешних утилит (`xdotool` / `wtype`) или тяжелых фреймворков автоматизации, которые дают сбои и вызывают просадки при скорости 200+ WPM, **softilium** подключается напрямую к интерфейсу отладки браузера (`/json` и метод `Input.dispatchKeyEvent`).
 
-- **Direct CDP Transport**: Communicates over asynchronous WebSockets (`tokio-tungstenite`) with sub-millisecond dispatch latency.
-- **Dynamic DOM Active-Word Tracking**: Evaluates strictly `#words .word.active` and untyped letters (`letter:not(.correct):not(.incorrect)`), completely avoiding DOM line-shift bugs during multi-line time tests.
-- **Biometric Pacing & Velocity Waves**: Implements harmonic velocity curves, intra-word burst acceleration, and cognitive pauses on word transitions.
-- **Physical Key Dwell Times**: Simulates hardware switch actuation durations (38–68 ms) rather than instantaneous synthetic releases.
-- **Digraph & N-gram Modeling**: Accelerates on high-frequency letter pairs (`th`, `er`, `in`, `ст`, `но`, etc.) matching human muscle-memory patterns.
-- **Natural Typo Simulation (`Legit Pro`)**: Models occasional misstrikes on adjacent keyboard physical layouts (QWERTY and JCUKEN) followed by visual reaction delays and Backspace corrections (~97.5–99% accuracy).
-- **Stealth Video Triggers**:
-  - `Hotkey (F8)`: Listens for in-browser F8 actuation so terminal windows remain hidden during screen capture or streaming.
-  - `Manual First-Key`: Awaits the user's manual first keystroke on their physical keyboard before seamlessly continuing automation.
-  - `Delay`: Provides an 8-second countdown to switch applications and configure recording software.
+В архитектуру заложена математическая модель моторики человеческих пальцев, что обеспечивает прохождение античита Monkeytype, естественный график скорости и правдоподобную телеметрию.
 
-## Architecture
+---
 
-```
+## Ключевые особенности
+
+### 1. Прямой транспорт CDP WebSocket
+- Мгновенная доставка нажатий напрямую в рендерер браузера через `tokio-tungstenite`.
+- Отсутствие промежуточных подпроцессов ОС гарантирует стабильный тайминг даже при скорости 300+ WPM.
+
+### 2. Динамическое отслеживание активного слова (Решение DOM Line-Shift)
+- В режимах на время Monkeytype удаляет прочитанные верхние строки из `#words` и добавляет новые снизу, из-за чего боты с индексацией по массивам зависают.
+- `softilium` через `Runtime.evaluate` запрашивает строго текущее активное слово (`#words .word.active`) и его ненапечатанные буквы (`letter:not(.correct):not(.incorrect)`). После каждого слова состояние считывается заново.
+
+### 3. Биометрическая кривая скорости (Волны графика WPM)
+- Вместо подозрительной прямой горизонтальной линии скорость плавно модулируется гармоническими волнами ($\pm 10\text{--}12\%$).
+- Имитируется естественный разгон в первые 1.5 секунды, микропаузы на длинных словах и динамическое чередование фаз концентрации.
+- На графике результатов Monkeytype формируется живая человеческая кривая.
+
+### 4. Человеческая консистентность (Consistency 72–78%)
+- Задержки между нажатиями подчиняются асимметричному логнормальному распределению.
+- Итоговая консистентность держится в золотом стандарте живых про-тайперов (72–78%), исключая детекты на «роботизированную стабильность 99-100%».
+
+### 5. Физическое удержание клавиш (Dwell Time 38–68 мс)
+- Отжатие клавиши (`keyUp`) происходит не мгновенно за 0 мс, а с естественной задержкой хода механического свича клавиатуры (38–68 мс, на пробеле 42–76 мс).
+
+### 6. Мышечная память N-грамм и диграфов
+- На частых буквосочетаниях (`th`, `er`, `in`, `ст`, `но`, `то`, `пр`, `на` и др.) скорость автоматически повышается на 22%, отражая моторную память рук.
+- Двойные буквы (`ll`, `ee`, `тт`, `сс`) нажимаются со скорректированным интервалом повторного тапа.
+
+### 7. Реалистичные опечатки и Backspace (`Legit Pro`)
+- В режиме `Legit Pro` бот изредка промахивается по физически соседней клавише на клавиатуре (поддерживаются раскладки QWERTY и ЙЦУКЕН).
+- Воспроизводится визуальная пауза реакции человека на ошибку (85–145 мс), нажатие `Backspace` и ввод верного символа.
+- На графике фиксируются реальные точки ошибок, обеспечивая естественную точность **~97.5–99%**.
+
+### 8. Скрытые режимы для записи видео (Stealth Recording)
+Специальные триггеры для беспалевной съемки в OBS, Discord или стримов:
+- **Хоткей F8 в браузере**: бот внедряет скрытый слушатель клавиши прямо на страницу. Терминал можно свернуть заранее — нажатие `F8` в браузере моментально начинает печать. На видео нет окна консоли и переключений Alt-Tab.
+- **Ручной старт по первой букве (Handoff)**: пользователь сам нажимает первую букву на клавиатуре, после чего бот мгновенно и бесшовно продолжает тест на заданной скорости.
+- **Скрытый таймер**: отсрочка 8 секунд на сворачивание окон и подготовку записи.
+
+---
+
+## Архитектура проекта
+
+```text
 softilium/
-├── Cargo.toml
+├── Cargo.toml        # Конфигурация крейтов и релизного профиля
 ├── src/
-│   ├── browser.rs    # Cross-platform browser discovery and CDP handshake
-│   ├── cdp.rs        # Asynchronous CDP WebSocket client and key dispatching
-│   ├── cli.rs        # CLI argument parsing and interactive terminal UI
-│   ├── engine.rs     # Velocity curves, timing profile, and n-gram modeling
-│   └── main.rs       # Execution loop and test completion telemetry
-└── tests/
+│   ├── browser.rs    # Автодетект браузеров и хэндшейк с портом 9222
+│   ├── cdp.rs        # Асинхронный CDP WebSocket-клиент и отправка клавиш
+│   ├── cli.rs        # Парсер аргументов командной строки и меню
+│   ├── engine.rs     # Математическая модель волн скорости, N-грамм и таймингов
+│   └── main.rs       # Основной цикл печати и сбор финальной статистики
+├── run.sh            # Скрипт быстрого запуска для Linux
+└── run.bat           # Скрипт быстрого запуска для Windows
 ```
 
-## Installation & Build
+---
 
-Ensure Rust (1.75+) is installed:
+## Сборка и установка
+
+Для сборки требуется компилятор Rust версии 1.75+:
 
 ```bash
 cargo build --release
 ```
 
-The compiled binary will be located at `target/release/softilium`.
+Скомпилированный бинарный файл находится по пути: `target/release/softilium`.
 
-## Usage
+---
 
-### Interactive Mode
+## Запуск и использование
 
-Simply run the binary without flags to enter the interactive prompt:
+### Интерактивное меню
+
+При запуске без аргументов открывается интерактивное меню:
 
 ```bash
-cargo run --release
+softilium
 ```
 
-### CLI Mode
+*(или `cargo run --release`)*
+
+Меню предложит:
+1. Выбрать браузер из списка найденных в системе.
+2. Указать скорость (100, 150, 180, 200, 250 WPM или вручную).
+3. Выбрать режим антидетекта (`Legit Pro`, `Legit Smooth` или `Flat`).
+4. Выбрать триггер скрытого запуска (`F8`, `Ручной старт`, `Таймер`, `Отсчет`).
+
+### Запуск через флаги командной строки
 
 ```bash
-# Run at 200 WPM with humanized velocity waves and realistic typos
+# 200 WPM, режим Legit Pro (живая кривая + редкие опечатки)
 softilium --wpm 200 --mode legit
 
-# Run at 250 WPM with 100% accuracy and stealth F8 hotkey trigger
+# 250 WPM со 100% точностью и скрытым запуском по клавише F8
 softilium --wpm 250 --mode smooth --trigger hotkey
 
-# Connect to a custom debugging port
+# Подключение к уже запущенному браузеру с кастомным портом CDP
 softilium --wpm 180 --cdp 127.0.0.1:9222
 ```
 
-### Supported Browsers
+---
 
-Automatically detects and configures:
-- Helium
-- Google Chrome
-- Chromium
-- Brave
-- Microsoft Edge
-- Yandex Browser
+## Поддерживаемые браузеры
 
-## License
+Автоматически обнаруживает и настраивает:
+- **Helium**
+- **Google Chrome / Chromium**
+- **Brave Browser**
+- **Microsoft Edge**
+- **Яндекс.Браузер**
 
-MIT License. See [LICENSE](LICENSE) for details.
+---
+
+## Лицензия
+
+Проект распространяется под открытой лицензией [MIT](LICENSE).
