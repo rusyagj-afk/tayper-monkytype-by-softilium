@@ -1,0 +1,20 @@
+[package]
+name = "softilium"
+version = "1.2.0"
+edition = "2021"
+authors = ["softilium"]
+description = "High-precision humanized Monkeytype client using raw Chrome DevTools Protocol"
+license = "MIT"
+readme = "README.md"
+keywords = ["monkeytype", "cdp", "typing", "automation", "cli"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+tokio = { version = "1.43", features = ["rt-multi-thread", "macros", "time", "sync", "process"] }
+tokio-tungstenite = "0.26"
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+rand = "0.8"
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
